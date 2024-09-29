@@ -9,6 +9,7 @@
 
 #include "TerrainQuery.h"
 #include "TerrainTileManager.h"
+#include "TerrainSRTM.h"
 #include "QGCLoggingCategory.h"
 
 #include <QtCore/QTimer>
@@ -169,7 +170,8 @@ void TerrainAtCoordinateQuery::requestData(const QList<QGeoCoordinate>& coordina
 
 bool TerrainAtCoordinateQuery::getAltitudesForCoordinates(const QList<QGeoCoordinate>& coordinates, QList<double>& altitudes, bool& error)
 {
-    return TerrainTileManager::instance()->getAltitudesForCoordinates(coordinates, altitudes, error);
+    //return TerrainTileManager::instance()->getAltitudesForCoordinates(coordinates, altitudes, error);
+    return TerrainSRTM::instance()->getAltitudesForCoordinates(coordinates, altitudes, error);
 }
 
 void TerrainAtCoordinateQuery::_signalTerrainData(bool success, QList<double>& heights)

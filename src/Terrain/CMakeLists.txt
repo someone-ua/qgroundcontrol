@@ -9,6 +9,8 @@ qt_add_library(Terrain STATIC
     TerrainTile.h
     TerrainTileManager.cc
     TerrainTileManager.h
+    TerrainSRTM.cc
+    TerrainSRTM.h
 )
 
 target_link_libraries(Terrain

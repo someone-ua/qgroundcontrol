@@ -96,6 +96,16 @@ elseif(WIN32)
     endif()
 endif()
 
+if(CMAKE_CROSSCOMPILING AND ANDROID)
+    set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY BOTH)
+    set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE BOTH)
+    set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE BOTH)
+endif()
+
+set(BUILD_SHARED_LIBS OFF)
+
+# include(CMakePrintSystemInformation)
+# include(ProcessorCount)
 cmake_print_variables(
     CMAKE_VERSION
     CMAKE_PREFIX_PATH
@@ -125,8 +135,9 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
         QT_NO_DEBUG_OUTPUT
     )
 elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    include(CTest)
+    set(ENABLE_TESTING ON)
     enable_testing()
+    include(CTest)
 
     set(QT_ENABLE_VERBOSE_DEPLOYMENT ON CACHE BOOL "Verbose Deployment")
 endif()
@@ -251,7 +262,8 @@ list(APPEND QGC_RESOURCES
     ${CMAKE_SOURCE_DIR}/src/FirmwarePlugin/PX4/PX4Resources.qrc
 )
 
-if(CONFIG_UTM_ADAPTER)
+if(QGC_UTM_ADAPTER)
+    add_definitions(-DQGC_UTM_ADAPTER)
     list(APPEND QGC_RESOURCES ${CMAKE_SOURCE_DIR}/src/UTMSP/utmsp.qrc)
 else()
     list(APPEND QGC_RESOURCES ${CMAKE_SOURCE_DIR}/src/UTMSP/dummy/utmsp_dummy.qrc)
@@ -278,19 +290,52 @@ endif()
 set_target_properties(${PROJECT_NAME}
     PROPERTIES
         QT_RESOURCE_PREFIX "/qgc"
-        OUTPUT_NAME ${QGC_APP_NAME}
+        OUTPUT_NAME ${CMAKE_PROJECT_NAME}
 )
 
 if(WIN32)
-    set(app_icon_resource_windows "${CMAKE_SOURCE_DIR}/deploy/windows/QGroundControl.rc")
+    # windows installer files shared with core and custom
+    set(DEPLOY_WIN_FILES
+        "${CMAKE_SOURCE_DIR}/deploy/windows/driver.msi"
+        "${CMAKE_SOURCE_DIR}/deploy/windows/nullsoft_installer.nsi"
+        "${CMAKE_SOURCE_DIR}/deploy/windows/QGroundControl.rc"
+        "${CMAKE_SOURCE_DIR}/deploy/windows/resource.h"
+    )
+    # windows installer files different for core and custom
+    if(EXISTS ${CMAKE_SOURCE_DIR}/custom/deploy/windows/installheader.bmp)
+        list(APPEND DEPLOY_WIN_FILES ${CMAKE_SOURCE_DIR}/custom/deploy/windows/installheader.bmp)
+    else()
+        list(APPEND DEPLOY_WIN_FILES ${CMAKE_SOURCE_DIR}/deploy/windows/installheader.bmp)
+    endif()
+    if(EXISTS ${CMAKE_SOURCE_DIR}/custom/deploy/windows/WindowsQGC.ico)
+        list(APPEND DEPLOY_WIN_FILES ${CMAKE_SOURCE_DIR}/custom/deploy/windows/WindowsQGC.ico)
+    else()
+        list(APPEND DEPLOY_WIN_FILES ${CMAKE_SOURCE_DIR}/deploy/windows/WindowsQGC.ico)
+    endif()
+
+    # Destination directory where files will be copied
+    set(QGC_INSTALLER_SOURCE_WIN "${CMAKE_BINARY_DIR}/deploy/windows")
+    file(MAKE_DIRECTORY ${QGC_INSTALLER_SOURCE_WIN})
+    foreach(FILE ${DEPLOY_WIN_FILES})
+        # filename without the path
+        get_filename_component(FILE_NAME ${FILE} NAME)
+        # re-copy the file if it changes
+        add_custom_command(
+            OUTPUT "${QGC_INSTALLER_SOURCE_WIN}/${FILE_NAME}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FILE}" "${QGC_INSTALLER_SOURCE_WIN}/${FILE_NAME}"
+            DEPENDS "${FILE}"  # Depend on the source file so that it re-copies when it changes
+        )
+        list(APPEND QGC_INSTALLER_SOURCE_WIN_FILES "${QGC_INSTALLER_SOURCE_WIN}/${FILE_NAME}")
+    endforeach()
+
     target_sources(${PROJECT_NAME}
         PRIVATE
-            ${app_icon_resource_windows}
+            ${QGC_INSTALLER_SOURCE_WIN_FILES}
     )
     set_target_properties(${PROJECT_NAME}
         PROPERTIES
             WIN32_EXECUTABLE TRUE
-            QT_TARGET_RC_ICONS "${CMAKE_SOURCE_DIR}/deploy/windows/WindowsQGC.ico"
+            QT_TARGET_RC_ICONS "${CMAKE_BINARY_DIR}/deploy/windows/WindowsQGC.ico"
     )
     add_compile_definitions(_USE_MATH_DEFINES)
 elseif(MACOS)
@@ -305,7 +350,7 @@ elseif(MACOS)
         PROPERTIES
             MACOSX_BUNDLE TRUE
             MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/deploy/mac/MacOSXBundleInfo.plist.in"
-            MACOSX_BUNDLE_BUNDLE_NAME "${QGC_APP_NAME}"
+            MACOSX_BUNDLE_BUNDLE_NAME "${CMAKE_PROJECT_NAME}"
             MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
             MACOSX_BUNDLE_COPYRIGHT "${QGC_APP_COPYRIGHT}"
             MACOSX_BUNDLE_GUI_IDENTIFIER "${QGC_BUNDLE_ID}"
@@ -357,7 +402,7 @@ elseif(LINUX)
 endif()
 
 add_compile_definitions(
-    QGC_APP_NAME="${QGC_APP_NAME}"
+    QGC_APP_NAME="${CMAKE_PROJECT_NAME}"
     QGC_ORG_NAME="${QGC_ORG_NAME}"
     QGC_ORG_DOMAIN="${QGC_ORG_DOMAIN}"
     QGC_APP_VERSION_STR="${QGC_APP_VERSION_STR}"
@@ -379,15 +424,17 @@ if(QGC_BUILD_TESTING)
     target_link_libraries(${PROJECT_NAME} PRIVATE qgctest)
 endif()
 
-#######################################################
-#		Install Configuration
-#######################################################
-
 qt_import_plugins(${PROJECT_NAME}
     INCLUDE Qt6::QSvgPlugin
     EXCLUDE_BY_TYPE geoservices
     INCLUDE_BY_TYPE sqldrivers Qt6::QSQLiteDriverPlugin
 )
+
+#######################################################
+#		Install Configuration
+#######################################################
+
+include(InstallRequiredSystemLibraries)
 
 install(
     TARGETS ${PROJECT_NAME}
@@ -417,11 +464,19 @@ if(LINUX)
         FILES ${CMAKE_BINARY_DIR}/org.mavlink.qgroundcontrol.desktop
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
     )
-    install(
-        FILES ${CMAKE_SOURCE_DIR}/resources/icons/qgroundcontrol.png
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/128x128/apps/
-        RENAME org.mavlink.qgroundcontrol.png
-    )
+    if(QGC_CUSTOM_BUILD)
+        install(
+            FILES ${CMAKE_SOURCE_DIR}/custom/res/icons/custom_qgroundcontrol.png
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/128x128/apps/
+            RENAME org.mavlink.qgroundcontrol.png
+        )
+    else()
+        install(
+            FILES ${CMAKE_SOURCE_DIR}/resources/icons/qgroundcontrol.png
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/128x128/apps/
+            RENAME org.mavlink.qgroundcontrol.png
+        )
+    endif()
     configure_file(
         ${CMAKE_SOURCE_DIR}/deploy/linux/org.mavlink.qgroundcontrol.metainfo.xml.in
         ${CMAKE_BINARY_DIR}/metainfo/org.mavlink.qgroundcontrol.metainfo.xml
@@ -433,7 +488,6 @@ if(LINUX)
     )
     install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateAppImage.cmake")
 elseif(WIN32)
-    # install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateQGCInstaller.cmake")
     install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateWinInstaller.cmake")
 elseif(MACOS)
     install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateMacDMG.cmake")

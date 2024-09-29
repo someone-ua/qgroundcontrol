@@ -62,9 +62,8 @@ public:
     /// Clears the interactive bit from all fence items
     Q_INVOKABLE void clearAllInteractive(void);
 
-#ifdef CONFIG_UTM_ADAPTER
+#ifdef QGC_UTM_ADAPTER
     Q_INVOKABLE void loadFlightPlanData(void);
-    Q_INVOKABLE bool loadUploadFlag(void);
 #endif
 
     double  paramCircularFence  (void);
@@ -98,7 +97,7 @@ signals:
     void loadComplete                   (void);
     void paramCircularFenceChanged      (void);
 
-#ifdef CONFIG_UTM_ADAPTER
+#ifdef QGC_UTM_ADAPTER
     void uploadFlagSent         (bool flag);
     void polygonBoundarySent    (QList<QGeoCoordinate> coords);
 #endif

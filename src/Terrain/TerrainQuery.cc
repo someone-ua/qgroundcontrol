@@ -227,7 +227,8 @@ void TerrainAtCoordinateQuery::signalTerrainData(bool success, const QList<doubl
 TerrainPathQuery::TerrainPathQuery(bool autoDelete, QObject *parent)
    : QObject(parent)
    , _autoDelete(autoDelete)
-   , _terrainQuery(new TerrainOfflineAirMapQuery(this))
+   //, _terrainQuery(new TerrainOfflineAirMapQuery(this))
+   , _terrainQuery(new TerrainSRTMQuery(this))
 {
     // qCDebug(AudioOutputLog) << Q_FUNC_INFO << this;
 

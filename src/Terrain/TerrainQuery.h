@@ -139,7 +139,7 @@ private slots:
 private:
     bool _autoDelete = false;
     //TerrainQueryInterface *_terrainQuery = nullptr;
-    TerrainSRTMQuery   _terrainQuery = nullptr;
+    TerrainSRTMQuery   *_terrainQuery = nullptr;
 };
 Q_DECLARE_METATYPE(TerrainPathQuery::PathHeightInfo_t)
 

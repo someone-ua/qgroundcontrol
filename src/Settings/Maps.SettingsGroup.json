@@ -27,13 +27,15 @@
     "name":             "useSRTMTerrainData",
     "shortDesc": "Use SRTM Terrain Data",
     "type":             "bool",
-    "default":     false
+    "default":     false,
+    "qgcRebootRequired":    true    
 },
 {
     "name":             "SRTMdataPath",
     "shortDesc": "SRTD data directory",
     "type":             "string",
-    "default":     ""
+    "default":     "",
+    "qgcRebootRequired":    true    
 }
 ]
 }

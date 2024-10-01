@@ -172,8 +172,7 @@ void TerrainSRTMQuery::requestCoordinateHeights(const QList<QGeoCoordinate>& coo
     bool error = false;
     TerrainSRTM::instance()->getAltitudesForCoordinates(coordinates,altitudes,error);
 
-    bool success = !error;
-    emit coordinateHeightsReceived(success, altitudes);
+    emit coordinateHeightsReceived(!error, altitudes);
 }
 
 void TerrainSRTMQuery::requestPathHeights(const QGeoCoordinate& fromCoord, const QGeoCoordinate& toCoord)

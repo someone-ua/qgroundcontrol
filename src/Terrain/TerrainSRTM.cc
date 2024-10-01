@@ -5,6 +5,9 @@
 #include <QString>
 #include "QGCLoggingCategory.h"
 #include <QtNumeric>
+#include "QGCApplication.h"
+#include "SettingsManager.h"
+#include "MapsSettings.h"
 
 QGC_LOGGING_CATEGORY(TerrainSRTMQueryLog, "qgc.terrainsrtm.terrainquery")
 Q_GLOBAL_STATIC(TerrainSRTM, s_terrainSRTM)
@@ -17,7 +20,7 @@ TerrainSRTM* TerrainSRTM::instance(void)
 TerrainSRTM::TerrainSRTM(QObject *parent)
     : QObject(parent)
 {
-    srtm_directory = "/Users/oleksii/Downloads/TerrainSRTM1";
+    srtm_directory = qgcApp()->toolbox()->settingsManager()->mapsSettings()->SRTMdataPath()->rawValueString();
     grid_spacing = 30;
 }
 

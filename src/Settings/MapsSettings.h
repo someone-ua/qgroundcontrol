@@ -21,4 +21,6 @@ public:
 
     DEFINE_SETTINGFACT(maxCacheDiskSize)
     DEFINE_SETTINGFACT(maxCacheMemorySize)
+    DEFINE_SETTINGFACT(useSRTMTerrainData)
+    DEFINE_SETTINGFACT(SRTMdataPath)
 };

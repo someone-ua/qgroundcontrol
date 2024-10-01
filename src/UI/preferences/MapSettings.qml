@@ -89,6 +89,49 @@ Item {
 
         SettingsGroupLayout {
             Layout.fillWidth:   true
+            heading:            qsTr("Elevation Data")
+            FactCheckBoxSlider {
+                Layout.fillWidth: true
+                text:       qsTr("Enable SRTM Terrain")
+                fact:       _useSRTMTerrainData
+                visible:    _useSRTMTerrainData.visible
+                property Fact   _useSRTMTerrainData:      _mapsSettings.useSRTMTerrainData
+            }
+
+            RowLayout {
+                Layout.fillWidth:   true
+                spacing:            ScreenTools.defaultFontPixelWidth * 2
+                visible:            _mapsSettings.SRTMdataPath.visible && !ScreenTools.isMobile
+
+                ColumnLayout {
+                    Layout.fillWidth:   true
+                    spacing:            0
+
+                    QGCLabel { text: qsTr("Elevation Data Path") }
+                    QGCLabel { 
+                        Layout.fillWidth:   true
+                        font.pointSize:     ScreenTools.smallFontPointSize
+                        text:               _mapsSettings.SRTMdataPath.rawValue === "" ? qsTr("<default location>") : _mapsSettings.SRTMdataPath.rawValue
+                        elide:              Text.ElideMiddle
+                    }
+                }
+
+                QGCButton {
+                    text:       qsTr("Browse")
+                    onClicked:  savePathBrowseDialog.openForLoad()
+                    QGCFileDialog {
+                        id:                 savePathBrowseDialog
+                        title:              qsTr("Choose the location of elevation data files")
+                        folder:             _mapsSettings.SRTMdataPath.rawValue
+                        selectFolder:       true
+                        onAcceptedForLoad:  (file) => _mapsSettings.SRTMdataPath.rawValue = file
+                    }
+                }
+            }
+        }
+
+        SettingsGroupLayout {
+            Layout.fillWidth:   true
             heading:            qsTr("Offline Maps")
             headingDescription: qsTr("Download map tiles for use when offline")
 

@@ -40,3 +40,5 @@ DECLARE_SETTINGGROUP(Maps, "Maps")
 
 DECLARE_SETTINGSFACT(MapsSettings, maxCacheDiskSize)
 DECLARE_SETTINGSFACT(MapsSettings, maxCacheMemorySize)
+DECLARE_SETTINGSFACT(MapsSettings, useSRTMTerrainData)
+DECLARE_SETTINGSFACT(MapsSettings, SRTMdataPath)

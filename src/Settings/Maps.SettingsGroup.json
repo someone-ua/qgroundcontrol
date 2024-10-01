@@ -22,6 +22,18 @@
     "default":              128,
     "mobileDefault":        16,
     "qgcRebootRequired":    true
+},
+{
+    "name":             "useSRTMTerrainData",
+    "shortDesc": "Use SRTM Terrain Data",
+    "type":             "bool",
+    "default":     false
+},
+{
+    "name":             "SRTMdataPath",
+    "shortDesc": "SRTD data directory",
+    "type":             "string",
+    "default":     ""
 }
 ]
 }

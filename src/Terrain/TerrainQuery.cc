@@ -12,6 +12,9 @@
 #include "TerrainTileManager.h"
 #include "TerrainSRTM.h"
 #include "QGCLoggingCategory.h"
+#include "QGCApplication.h"
+#include "SettingsManager.h"
+#include "MapsSettings.h"
 
 #include <QtCore/QTimer>
 
@@ -23,9 +26,18 @@ Q_GLOBAL_STATIC(TerrainAtCoordinateBatchManager, _terrainAtCoordinateBatchManage
 TerrainAtCoordinateBatchManager::TerrainAtCoordinateBatchManager(QObject *parent)
     : QObject(parent)
     , _batchTimer(new QTimer(this))
-    , _terrainQuery(new TerrainOfflineAirMapQuery(this))
+    //, _terrainQuery(new TerrainOfflineAirMapQuery(this))
 {
     // qCDebug(TerrainQueryLog) << Q_FUNC_INFO << this;
+
+    if (qgcApp()->toolbox()->settingsManager()->mapsSettings()->useSRTMTerrainData()->rawValue().toBool())
+    {
+        _terrainQuery = new TerrainSRTMQuery(this);
+    }
+    else
+    {
+        _terrainQuery = new TerrainOfflineAirMapQuery(this);
+    }
 
     _batchTimer->setSingleShot(true);
     _batchTimer->setInterval(_batchTimeout);
@@ -228,9 +240,17 @@ TerrainPathQuery::TerrainPathQuery(bool autoDelete, QObject *parent)
    : QObject(parent)
    , _autoDelete(autoDelete)
    //, _terrainQuery(new TerrainOfflineAirMapQuery(this))
-   , _terrainQuery(new TerrainSRTMQuery(this))
 {
     // qCDebug(AudioOutputLog) << Q_FUNC_INFO << this;
+
+    if (qgcApp()->toolbox()->settingsManager()->mapsSettings()->useSRTMTerrainData()->rawValue().toBool())
+    {
+        _terrainQuery = new TerrainSRTMQuery(this);
+    }
+    else
+    {
+        _terrainQuery = new TerrainOfflineAirMapQuery(this);
+    }
 
     (void) connect(_terrainQuery, &TerrainQueryInterface::pathHeightsReceived, this, &TerrainPathQuery::_pathHeights);
 }

@@ -222,8 +222,10 @@ void TerrainAtCoordinateQuery::requestData(const QList<QGeoCoordinate> &coordina
 
 bool TerrainAtCoordinateQuery::getAltitudesForCoordinates(const QList<QGeoCoordinate> &coordinates, QList<double> &altitudes, bool &error)
 {
-    //return TerrainTileManager::instance()->getAltitudesForCoordinates(coordinates, altitudes, error);
-    return TerrainSRTM::instance()->getAltitudesForCoordinates(coordinates, altitudes, error);
+    if (qgcApp()->toolbox()->settingsManager()->mapsSettings()->useSRTMTerrainData()->rawValue().toBool())
+        return TerrainSRTM::instance()->getAltitudesForCoordinates(coordinates, altitudes, error);
+    else
+        return TerrainTileManager::instance()->getAltitudesForCoordinates(coordinates, altitudes, error);
 }
 
 void TerrainAtCoordinateQuery::signalTerrainData(bool success, const QList<double> &heights)

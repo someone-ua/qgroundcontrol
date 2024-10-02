@@ -82,8 +82,8 @@ void TerrainSRTM::offset_latlng(QGeoCoordinate &coordinate, float ofs_north, flo
 
 int TerrainSRTM::east_blocks(QGeoCoordinate coordinate)
 {
-    coordinate.setLatitude((int)coordinate.latitude());
-    coordinate.setLongitude((int)coordinate.longitude());
+    coordinate.setLatitude((int)qAbs(coordinate.latitude()));
+    coordinate.setLongitude((int)qAbs(coordinate.longitude()));
     QGeoCoordinate coordinate2(coordinate);
     coordinate2.setLongitude(coordinate2.longitude() + 1);
 
@@ -109,14 +109,21 @@ bool TerrainSRTM::getAltitudesForCoordinates(const QList<QGeoCoordinate>& coordi
 {
     for (const QGeoCoordinate& coordinate: coordinates) {
         QGeoCoordinate ref(coordinate);
-        ref.setLatitude((int)qAbs(coordinate.latitude()));
-        ref.setLongitude((int)qAbs(coordinate.longitude()));
+        ref.setLatitude((int)coordinate.latitude());
+        ref.setLongitude((int)coordinate.longitude());
+        if (coordinate.latitude() < 0) {
+            ref.setLatitude(ref.latitude() - 1);
+        }
+        if (coordinate.longitude() < 0) {
+            ref.setLongitude(ref.longitude() - 1);
+        }
+
         QString path = QString("%1/%2%3%4%5.DAT")
             .arg(srtm_directory)
             .arg(coordinate.latitude() <0?'S':'N')
-            .arg((int)ref.latitude(), 2, 10, QChar('0'))
+            .arg((int)qAbs(ref.latitude()), 2, 10, QChar('0'))
             .arg(coordinate.longitude() <0?'W':'E')
-            .arg((int)ref.longitude(), 3, 10, QChar('0'));
+            .arg((int)qAbs(ref.longitude()), 3, 10, QChar('0'));
 
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly)) {
@@ -190,12 +197,11 @@ void TerrainSRTMQuery::requestPathHeights(const QGeoCoordinate& fromCoord, const
 
     coordinates = TerrainTileManager::pathQueryToCoords(fromCoord, toCoord, distanceBetween, finalDistanceBetween);
 
-    bool error;
+    bool error = false;
     QList<double> altitudes;
     TerrainSRTM::instance()->getAltitudesForCoordinates(coordinates,altitudes,error);
 
-    bool success = true;
-    emit pathHeightsReceived(success, distanceBetween, finalDistanceBetween, altitudes);
+    emit pathHeightsReceived(!error, distanceBetween, finalDistanceBetween, altitudes);
 }
 
 void TerrainSRTMQuery::requestCarpetHeights(const QGeoCoordinate& swCoord, const QGeoCoordinate& neCoord, bool statsOnly)

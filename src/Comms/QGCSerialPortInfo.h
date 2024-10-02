@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- * (c) 2009-2020 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
+ * (c) 2009-2024 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
  *
  * QGroundControl is licensed according to the terms in the file
  * COPYING.md in the root of the source code directory.
@@ -35,7 +35,6 @@ public:
     enum BoardType_t {
         BoardTypePixhawk,
         BoardTypeSiKRadio,
-        BoardTypePX4Flow,
         BoardTypeOpenPilot,
         BoardTypeRTKGPS,
         BoardTypeUnknown
@@ -68,7 +67,6 @@ private:
     };
     static constexpr const BoardClassString2BoardType_t _rgBoardClass2BoardType[BoardTypeUnknown] = {
         { "Pixhawk", QGCSerialPortInfo::BoardTypePixhawk },
-        { "PX4 Flow", QGCSerialPortInfo::BoardTypePX4Flow },
         { "RTK GPS", QGCSerialPortInfo::BoardTypeRTKGPS },
         { "SiK Radio", QGCSerialPortInfo::BoardTypeSiKRadio },
         { "OpenPilot", QGCSerialPortInfo::BoardTypeOpenPilot },

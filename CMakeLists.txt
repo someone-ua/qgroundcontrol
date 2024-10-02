@@ -58,6 +58,8 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
 set(CMAKE_INCLUDE_CURRENT_DIR OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug;Release")
 if(NOT CMAKE_BUILD_TYPE)
@@ -83,16 +85,16 @@ elseif(WIN32)
         message(STATUS "Using SCCache")
         set(CMAKE_C_COMPILER_LAUNCHER ${SCCACHE_PROGRAM})
         set(CMAKE_CXX_COMPILER_LAUNCHER ${SCCACHE_PROGRAM})
-        if(MSVC)
-            if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-                string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
-                string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
-            elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-                string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
-                string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
-            endif()
-            set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded)
+    endif()
+    if(MSVC)
+        if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+            string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+            string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+        elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+            string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+            string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
         endif()
+        set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded)
     endif()
 endif()
 
@@ -103,20 +105,6 @@ if(CMAKE_CROSSCOMPILING AND ANDROID)
 endif()
 
 set(BUILD_SHARED_LIBS OFF)
-
-# include(CMakePrintSystemInformation)
-# include(ProcessorCount)
-cmake_print_variables(
-    CMAKE_VERSION
-    CMAKE_PREFIX_PATH
-    CMAKE_HOST_SYSTEM_NAME
-    CMAKE_HOST_SYSTEM_VERSION
-    CMAKE_SYSTEM_NAME
-    CMAKE_SYSTEM_VERSION
-    CMAKE_CURRENT_SOURCE_DIR
-    CMAKE_BUILD_TYPE
-    CMAKE_TOOLCHAIN_FILE
-)
 
 #######################################################
 #               Qt6 Configuration
@@ -189,7 +177,10 @@ find_package(Qt6
         Xml
     OPTIONAL_COMPONENTS
         LinguistTools
+        MultimediaQuickPrivate
+        Quick3D
         SerialPort
+        WaylandClient
     HINTS
         ${QT_LIBRARY_HINTS}
 )
@@ -230,6 +221,15 @@ cmake_dependent_option(QGC_NO_SERIAL_LINK "Build QGroundControl without Serial S
 if(QGC_DISABLE_APM_MAVLINK)
     add_compile_definitions(NO_ARDUPILOT_DIALECT)
 endif()
+
+if("${CMAKE_OSX_ARCHITECTURES}" MATCHES "arm64;x86_64" OR "${CMAKE_OSX_ARCHITECTURES}" MATCHES "x86_64;arm64")
+    set(MACOS_UNIVERSAL_BUILD ON CACHE INTERNAL "" FORCE)
+endif()
+
+# TODO: Force building dependencies if(NOT CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL CMAKE_SYSTEM_PROCESSOR)?
+# if(CMAKE_OSX_ARCHITECTURES AND NOT "${CMAKE_HOST_SYSTEM_PROCESSOR}" IN_LIST CMAKE_OSX_ARCHITECTURES)
+
+cmake_dependent_option(QGC_BUILD_DEPENDENCIES "Force Building of Dependencies." OFF "NOT CMAKE_CROSSCOMPILING;NOT MACOS_UNIVERSAL_BUILD" ON)
 
 #######################################################
 #                Custom Build Configuration
@@ -283,8 +283,14 @@ qt_add_executable(${PROJECT_NAME}
 )
 
 if(Qt6LinguistTools_FOUND)
-    file(GLOB TS_SOURCES RELATIVE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/translations/qgc_*.ts)
-    qt_add_translations(${PROJECT_NAME} TS_FILES ${TS_SOURCES}) # TODO: Update to new qt_add_translations form in Qt6.7
+    # TODO: Update to new qt_add_translations form in Qt6.7
+    file(GLOB TS_SOURCES ${CMAKE_SOURCE_DIR}/translations/qgc_*.ts)
+    set_source_files_properties(${TS_SOURCES} PROPERTIES OUTPUT_LOCATION "${CMAKE_BINARY_DIR}/i18n")
+    qt_add_translations(${PROJECT_NAME}
+        TS_FILES ${TS_SOURCES}
+        RESOURCE_PREFIX "/"
+        LUPDATE_OPTIONS -no-obsolete
+    )
 endif()
 
 set_target_properties(${PROJECT_NAME}
@@ -361,9 +367,27 @@ elseif(MACOS)
     )
 elseif(IOS)
     enable_language(OBJC)
+
+    set(CMAKE_OSX_ARCHITECTURES "arm64")
+    set(CMAKE_OSX_SYSROOT "iphoneos")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0")
+    set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "14.0")
+    set(CMAKE_XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2") # iPhone,iPad
+    set(CMAKE_XCODE_ATTRIBUTE_INFOPLIST_FILE "${CMAKE_CURRENT_SOURCE_DIR}/deploy/ios/iOS-Info.plist")
+
     set_target_properties(${PROJECT_NAME}
         PROPERTIES
             QT_IOS_LAUNCH_SCREEN ${CMAKE_SOURCE_DIR}/deploy/ios/QGCLaunchScreen.xib
+            XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.mavlink.qgroundcontrol"
+            XCODE_ATTRIBUTE_PRODUCT_NAME ${CMAKE_PROJECT_NAME}
+            XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION ${CMAKE_PROJECT_VERSION}
+            XCODE_ATTRIBUTE_MARKETING_VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+            XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
+            XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "14.0"
+            XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2" # iPhone,iPad
+            XCODE_ATTRIBUTE_INFOPLIST_KEY_CFBundleDisplayName ${CMAKE_PROJECT_NAME}
+            XCODE_ATTRIBUTE_INFOPLIST_KEY_LSApplicationCategoryType "public.app-category.mycategory"
+            XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS "YES"
     )
 elseif(ANDROID)
     FetchContent_Declare(android_openssl
@@ -389,8 +413,8 @@ elseif(ANDROID)
     set_target_properties(${PROJECT_NAME}
         PROPERTIES
             # QT_ANDROID_ABIS ${ANDROID_ABI}
-            QT_ANDROID_MIN_SDK_VERSION 26
-            QT_ANDROID_TARGET_SDK_VERSION 34
+            QT_ANDROID_MIN_SDK_VERSION 25
+            QT_ANDROID_TARGET_SDK_VERSION 35
             QT_ANDROID_PACKAGE_SOURCE_DIR ${CMAKE_SOURCE_DIR}/android
             QT_ANDROID_VERSION_NAME ${CMAKE_PROJECT_VERSION}
             QT_ANDROID_VERSION_CODE ${ANDROID_VERSION_CODE}
@@ -492,3 +516,5 @@ elseif(WIN32)
 elseif(MACOS)
     install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateMacDMG.cmake")
 endif()
+
+include(printSummary)

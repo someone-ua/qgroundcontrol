@@ -23,20 +23,20 @@ on:
 
 jobs:
   build:
-    runs-on: macos-13
+    runs-on: macos-latest
 
     strategy:
       matrix:
-        BuildType: [Debug, Release]
+        BuildType: [Release]
+
+    defaults:
+      run:
+        shell: bash
 
     env:
       ARTIFACT: QGroundControl.dmg
       QT_VERSION: 6.6.3
       GST_VERSION: 1.22.12
-
-    defaults:
-      run:
-        shell: bash
 
     steps:
       - name: Checkout repo
@@ -46,12 +46,17 @@ jobs:
           fetch-tags: true
           fetch-depth: 0
 
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
       - uses: seanmiddleditch/gha-setup-ninja@v5
 
       - name: Install Dependencies
         run: |
           brew update
-          brew install cmake ninja ccache geographiclib SDL2
+          brew install cmake ninja ccache geographiclib SDL2 exiv2
 
       - name: Install Gstreamer
         run: |
@@ -78,6 +83,7 @@ jobs:
           aqtversion: ==3.1.*
           host: mac
           target: desktop
+          arch: clang_64
           dir: ${{ runner.temp }}
           modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors
           cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
@@ -88,6 +94,7 @@ jobs:
         working-directory: ${{ runner.temp }}/shadow_build_dir
         run: ${{ env.QT_ROOT_DIR }}/bin/qt-cmake -S ${{ github.workspace }} -B . -G Ninja
               -DCMAKE_BUILD_TYPE=${{ matrix.BuildType }}
+              -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
               -DQGC_BUILD_TESTING=${{ matrix.BuildType == 'Debug' && 'ON' || 'OFF' }}
               -DQGC_STABLE_BUILD=${{ github.ref_type == 'tag' || contains(github.ref, 'Stable') && 'ON' || 'OFF' }}
 

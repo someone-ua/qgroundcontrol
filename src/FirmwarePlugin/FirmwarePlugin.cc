@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- * (c) 2009-2020 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
+ * (c) 2009-2024 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
  *
  * QGroundControl is licensed according to the terms in the file
  * COPYING.md in the root of the source code directory.
@@ -265,6 +265,12 @@ void
 FirmwarePlugin::guidedModeChangeEquivalentAirspeedMetersSecond(Vehicle*, double)
 {
     // Not supported by generic vehicle
+    qgcApp()->showAppMessage(guided_mode_not_supported_by_vehicle);
+}
+
+void FirmwarePlugin::guidedModeChangeHeading(Vehicle *vehicle, const QGeoCoordinate &headingCoord)
+{
+    Q_UNUSED(vehicle);
     qgcApp()->showAppMessage(guided_mode_not_supported_by_vehicle);
 }
 

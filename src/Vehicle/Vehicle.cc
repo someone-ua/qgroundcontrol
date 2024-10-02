@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- * (c) 2009-2020 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
+ * (c) 2009-2024 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
  *
  * QGroundControl is licensed according to the terms in the file
  * COPYING.md in the root of the source code directory.
@@ -293,7 +293,7 @@ void Vehicle::_commonInit()
     _componentInformationManager    = new ComponentInformationManager   (this);
     _initialConnectStateMachine     = new InitialConnectStateMachine    (this);
     _ftpManager                     = new FTPManager                    (this);
-    _imageProtocolManager           = new ImageProtocolManager          ();
+
     _vehicleLinkManager             = new VehicleLinkManager            (this);
 
     connect(_standardModes, &StandardModes::modesUpdated, this, &Vehicle::flightModesChanged);
@@ -325,8 +325,7 @@ void Vehicle::_commonInit()
     // Flight modes can differ based on advanced mode
     connect(_toolbox->corePlugin(), &QGCCorePlugin::showAdvancedUIChanged, this, &Vehicle::flightModesChanged);
 
-    connect(_imageProtocolManager, &ImageProtocolManager::imageReady, this, &Vehicle::_imageProtocolImageReady);
-
+    _createImageProtocolManager();
     _createStatusTextHandler();
 
     // _addFactGroup(_vehicleFactGroup,            _vehicleFactGroupName);
@@ -530,7 +529,7 @@ void Vehicle::_mavlinkMessageReceived(LinkInterface* link, mavlink_message_t mes
     }
     _ftpManager->_mavlinkMessageReceived(message);
     _parameterManager->mavlinkMessageReceived(message);
-    _imageProtocolManager->mavlinkMessageReceived(message);
+    (void) QMetaObject::invokeMethod(_imageProtocolManager, "mavlinkMessageReceived", Qt::AutoConnection, message);
     _remoteIDManager->mavlinkMessageReceived(message);
 
     _waitForMavlinkMessageMessageReceivedHandler(message);
@@ -1879,14 +1878,6 @@ void Vehicle::_sendQGCTimeToVehicle()
     sendMessageOnLinkThreadSafe(sharedLink.get(), msg);
 }
 
-void Vehicle::_imageProtocolImageReady(void)
-{
-    QImage img = _imageProtocolManager->getImage();
-    qgcApp()->qgcImageProvider()->setImage(&img, _id);
-    _flowImageIndex++;
-    emit flowImageIndexChanged();
-}
-
 void Vehicle::_remoteControlRSSIChanged(uint8_t rssi)
 {
     //-- 0 <= rssi <= 100 - 255 means "invalid/unknown"
@@ -2066,6 +2057,11 @@ bool Vehicle::roiModeSupported() const
 bool Vehicle::takeoffVehicleSupported() const
 {
     return _firmwarePlugin->isCapable(this, FirmwarePlugin::TakeoffVehicleCapability);
+}
+
+bool Vehicle::changeHeadingSupported() const
+{
+    return _firmwarePlugin->isCapable(this, FirmwarePlugin::ChangeHeadingCapability);
 }
 
 QString Vehicle::gotoFlightMode() const
@@ -2287,6 +2283,16 @@ void Vehicle::stopGuidedModeROI()
                     static_cast<float>(qQNaN()),    // Empty
                     static_cast<float>(qQNaN()));   // Empty
     }
+}
+
+void Vehicle::guidedModeChangeHeading(const QGeoCoordinate &headingCoord)
+{
+    if (!changeHeadingSupported()) {
+        qgcApp()->showAppMessage(tr("Change Heading not supported by Vehicle."));
+        return;
+    }
+
+    _firmwarePlugin->guidedModeChangeHeading(this, headingCoord);
 }
 
 void Vehicle::pauseVehicle()
@@ -2515,7 +2521,7 @@ void Vehicle::_sendMavCommandWorker(
         bool    compIdAll       = targetCompId == MAV_COMP_ID_ALL;
         QString rawCommandName  = _toolbox->missionCommandTree()->rawName(command);
 
-        qCDebug(VehicleLog) << QStringLiteral("_sendMavCommandWorker failing %1").arg(compIdAll ? "MAV_COMP_ID_ALL not supported" : "duplicate command") << rawCommandName;
+        qCDebug(VehicleLog) << QStringLiteral("_sendMavCommandWorker failing %1").arg(compIdAll ? "MAV_COMP_ID_ALL not supported" : "duplicate command") << rawCommandName << param1 << param2 << param3 << param4 << param5 << param6 << param7;
 
         MavCmdResultFailureCode_t failureCode = compIdAll ? MavCmdResultCommandResultOnly : MavCmdResultFailureDuplicateCommand;
         if (ackHandlerInfo && ackHandlerInfo->resultHandler) {
@@ -2560,6 +2566,8 @@ void Vehicle::_sendMavCommandWorker(
     entry.ackTimeoutMSecs   = sharedLink->linkConfiguration()->isHighLatency() ? _mavCommandAckTimeoutMSecsHighLatency : _mavCommandAckTimeoutMSecs;
     entry.elapsedTimer.start();
 
+    qCDebug(VehicleLog) << Q_FUNC_INFO << "command:param1-7" << command << param1 << param2 << param3 << param4 << param5 << param6 << param7;
+
     _mavCommandList.append(entry);
     _sendMavCommandFromList(_mavCommandList.count() - 1);
 }
@@ -2571,7 +2579,7 @@ void Vehicle::_sendMavCommandFromList(int index)
     QString rawCommandName  = _toolbox->missionCommandTree()->rawName(commandEntry.command);
 
     if (++_mavCommandList[index].tryCount > commandEntry.maxTries) {
-        qCDebug(VehicleLog) << "_sendMavCommandFromList giving up after max retries" << rawCommandName;
+        qCDebug(VehicleLog) << Q_FUNC_INFO << "giving up after max retries" << rawCommandName;
         _mavCommandList.removeAt(index);
         if (commandEntry.ackHandlerInfo.resultHandler) {
             mavlink_command_ack_t ack = {};
@@ -2592,7 +2600,7 @@ void Vehicle::_sendMavCommandFromList(int index)
         return;
     }
 
-    qCDebug(VehicleLog) << "_sendMavCommandFromList command:tryCount" << rawCommandName << commandEntry.tryCount;
+    qCDebug(VehicleLog) << Q_FUNC_INFO << "command:tryCount:param1-7" << rawCommandName << commandEntry.tryCount << commandEntry.rgParam1 << commandEntry.rgParam2 << commandEntry.rgParam3 << commandEntry.rgParam4 << commandEntry.rgParam5 << commandEntry.rgParam6 << commandEntry.rgParam7;
 
     SharedLinkInterfacePtr sharedLink = vehicleLinkManager()->primaryLink().lock();
     if (!sharedLink) {
@@ -2772,6 +2780,15 @@ void Vehicle::_waitForMavlinkMessageMessageReceivedHandler(const mavlink_message
 
         qCDebug(VehicleLog) << Q_FUNC_INFO << "message received - compId:msgId" << message.compid << message.msgid;
 
+        if (!pInfo->commandAckReceived) {
+            qCDebug(VehicleLog) << Q_FUNC_INFO << "message received before ack came back.";
+            int entryIndex = _findMavCommandListEntryIndex(message.compid, MAV_CMD_REQUEST_MESSAGE);
+            if (entryIndex != -1) {
+                _mavCommandList.takeAt(entryIndex);
+            } else {
+                qWarning() << Q_FUNC_INFO << "Removing request message command from list failed - not found in list";
+            }
+        }
         _removeRequestMessageInfo(message.compid, message.msgid);
 
         (*resultHandler)(resultHandlerData, MAV_RESULT_ACCEPTED, RequestMessageNoFailure, message);
@@ -2831,9 +2848,8 @@ void Vehicle::_requestMessageCmdResultHandler(void* resultHandlerData_, [[maybe_
     }
 
     if (requestMessageInfo->messageReceived) {
-        // We got the message before we got the ack back!
-        vehicle->_removeRequestMessageInfo(requestMessageInfo->compId, requestMessageInfo->msgId);
-        (resultHandler)(resultHandlerData, static_cast<MAV_RESULT>(ack.result),  RequestMessageNoFailure, message);
+        // This should never happen. The command should have already been removed from the list when the message was received
+        qWarning() << Q_FUNC_INFO << "Command result handler should now have been called if message has already been received";
     } else {
         // Now that the request has been acked we start the timer to wait for the message
         requestMessageInfo->messageWaitElapsedTimer.start();
@@ -4071,6 +4087,25 @@ void Vehicle::sendSetupSigning()
     for (uint8_t i = 0; i < 2; ++i) {
         sendMessageOnLinkThreadSafe(sharedLink.get(), msg);
     }
+}
+
+/*---------------------------------------------------------------------------*/
+/*===========================================================================*/
+/*                        Image Protocol Manager                             */
+/*===========================================================================*/
+
+void Vehicle::_createImageProtocolManager()
+{
+    _imageProtocolManager = new ImageProtocolManager(this);
+    (void) connect(_imageProtocolManager, &ImageProtocolManager::flowImageIndexChanged, this, &Vehicle::flowImageIndexChanged);
+    (void) connect(_imageProtocolManager, &ImageProtocolManager::imageReady, this, [this](const QImage &image) {
+        qgcApp()->qgcImageProvider()->setImage(image, _id);
+    });
+}
+
+uint32_t Vehicle::flowImageIndex() const
+{
+    return (_imageProtocolManager ? _imageProtocolManager->flowImageIndex() : 0);
 }
 
 /*---------------------------------------------------------------------------*/

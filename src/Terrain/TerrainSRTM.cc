@@ -21,7 +21,14 @@ TerrainSRTM::TerrainSRTM(QObject *parent)
     : QObject(parent)
 {
     srtm_directory = qgcApp()->toolbox()->settingsManager()->mapsSettings()->SRTMdataPath()->rawValueString();
-    grid_spacing = 30;
+    if (qgcApp()->toolbox()->settingsManager()->mapsSettings()->SRTMType()->enumIndex() == 0)
+    {
+        grid_spacing = 30;
+    }
+    else
+    {
+        grid_spacing = 100;
+    }
 }
 
 TerrainSRTM::~TerrainSRTM()

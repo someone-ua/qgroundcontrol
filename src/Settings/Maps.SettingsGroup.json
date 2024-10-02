@@ -36,6 +36,16 @@
     "type":             "string",
     "default":     "",
     "qgcRebootRequired":    true    
+},
+{
+    "name":             "SRTMType",
+    "shortDesc": "SRTM data type",
+    "longDesc":  "SRTM data type. SRTM1: 30m (1 arc-second) horizontal resolution. SRTM3: 100m (3 arc-second) horizontal resolution.",
+    "type":             "uint32",
+    "enumStrings":      "SRTM1,SRTM3",
+    "enumValues":       "0,1",
+    "default":     0,
+    "qgcRebootRequired":    true
 }
 ]
 }

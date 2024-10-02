@@ -98,6 +98,13 @@ Item {
                 property Fact   _useSRTMTerrainData:      _mapsSettings.useSRTMTerrainData
             }
 
+            LabelledFactComboBox {
+                Layout.fillWidth:   true
+                label:              qsTr("SRTM data type")
+                fact:               _mapsSettings.SRTMType
+                visible:            _mapsSettings.SRTMType.visible
+            }
+
             RowLayout {
                 Layout.fillWidth:   true
                 spacing:            ScreenTools.defaultFontPixelWidth * 2
